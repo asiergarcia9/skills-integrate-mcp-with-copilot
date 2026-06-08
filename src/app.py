@@ -8,6 +8,7 @@ for extracurricular activities at Mergington High School.
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+import json
 import os
 from pathlib import Path
 
@@ -18,6 +19,57 @@ app = FastAPI(title="Mergington High School API",
 current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
+
+MCP_CONFIG_PATH = current_dir.parent / ".vscode" / "mcp.json"
+
+
+def load_mcp_config() -> dict:
+    if not MCP_CONFIG_PATH.exists():
+        raise HTTPException(status_code=500, detail="MCP config file not found")
+
+    try:
+        return json.loads(MCP_CONFIG_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="MCP config file contains invalid JSON")
+
+
+def validate_mcp_config(config: dict) -> dict:
+    if not isinstance(config, dict):
+        raise HTTPException(status_code=500, detail="MCP config must be a JSON object")
+
+    servers = config.get("servers")
+    if not isinstance(servers, dict):
+        raise HTTPException(status_code=500, detail="Missing or invalid 'servers' object in MCP config")
+
+    github = servers.get("github")
+    if not isinstance(github, dict):
+        raise HTTPException(status_code=500, detail="Missing 'github' server configuration in MCP config")
+
+    server_type = github.get("type")
+    if server_type != "http":
+        raise HTTPException(status_code=500, detail="Expected github.type to be 'http'")
+
+    url = github.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise HTTPException(status_code=500, detail="Missing or invalid github.url")
+
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=500, detail="github.url must begin with http:// or https://")
+
+    return {
+        "type": server_type,
+        "url": url,
+    }
+
+
+@app.get("/mcp-config")
+def get_mcp_config_status():
+    config = load_mcp_config()
+    validated = validate_mcp_config(config)
+    return {
+        "valid": True,
+        "server": validated,
+    }
 
 # In-memory activity database
 activities = {
