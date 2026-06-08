@@ -1,0 +1,24 @@
+name: Validate MCP configuration
+
+on:
+  push:
+    branches:
+      - main
+      - issue-8-validate-mcp-config
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-mcp-config:
+    name: Validate MCP configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate MCP config
+        run: python validate_mcp_config.py
